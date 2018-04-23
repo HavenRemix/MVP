@@ -49,13 +49,17 @@ protected:
 // ------- COMPONENTS ------- \\
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USkeletalMeshComponent* FPSMesh;
+	USpringArmComponent* SpringArmComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UCameraComponent* CameraComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USHealthComponent* HealthComp;
+
+// ------- FUNCTIONS ------- \\
+
+	void FinishAction();
 
 // ------- VARIABLES ------- \\
 
@@ -73,29 +77,17 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 	bool bDied;
 
-// ------- ANIMATIONS ------- \\
+// ------- AUDIO ------- \\
 
-	UPROPERTY(EditDefaultsOnly, Category = "Animations")
-	UAnimSequence* ReloadAnim;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Animations")
-	UAnimSequence* EquipAnim;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Animations")
-	UAnimSequence* FPPReloadAnim;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Animations")
-	UAnimSequence* FPPEquipAnim;
-
-// ------- FUNCTIONS ------- \\
-
-	void ChangeAnimMode();
+	UPROPERTY(EditDefaultsOnly)
+	USoundCue* MusicTrack;
 
 // ------- EXTERNALS ------- \\
 
 //Weapon
 
-	int WeaponNum;
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+	bool IsRifleType;
 
 	UPROPERTY(VisibleDefaultsOnly, Category = "Weapon")
 	FName WeaponAttachSocketName;
@@ -116,9 +108,6 @@ protected:
 //Timer
 
 	FTimerHandle TimerHandle_ReloadTimer;
-	FTimerHandle TimerHandle_FPPReloadTimer;
-	FTimerHandle TimerHandle_EquipTimer;
-	FTimerHandle TimerHandle_FPPEquipTimer;
 
 public:
 
@@ -156,16 +145,11 @@ public:
 
 	void Reload();
 
-// ------- AUDIO ------- \\
-
-	UFUNCTION(Exec)
-	void PlaySong();
-
-	UPROPERTY(EditDefaultsOnly)
-	USoundCue* ReMixTrax;
-
 // ------- VARIABLES ------- \\
 
-	UPROPERTY(BlueprintReadWrite, Category = "Weapons")
+	UPROPERTY(BlueprintReadOnly, Category = "Animations")
 	bool bWantsToZoom;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Animations")
+	bool bReloading;
 };

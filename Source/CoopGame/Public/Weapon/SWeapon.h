@@ -35,14 +35,15 @@ public:
 	virtual void StartFire();
 	virtual void StopFire();
 
-	UFUNCTION(BlueprintCallable)
 	virtual void ReloadWeapon();
-
 
 // ------- EXTRA ------- \\
 
 	UFUNCTION()
 	virtual bool IsTargeting(bool WasTargeting);
+
+	UPROPERTY(EditDefaultsOnly)
+	bool IsRifle;
 
 protected:
 

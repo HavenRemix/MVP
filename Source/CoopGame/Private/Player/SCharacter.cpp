@@ -17,6 +17,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Containers/Array.h"
 #include "Math/UnrealMathUtility.h"
+#include "TimerManager.h"
+#include "GameFramework/SpringArmComponent.h"
+
 
 
 
@@ -24,25 +27,21 @@ ASCharacter::ASCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+//Default Mesh
+
+	GetMesh()->bCastDynamicShadow = true;
+	GetMesh()->CastShadow = true;
+
+//Spring Arm
+
+	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
+	SpringArmComp->bUsePawnControlRotation = true;
+	SpringArmComp->SetupAttachment(RootComponent);
+
 //Camera Comp
 
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
-	CameraComp->SetupAttachment(RootComponent);
-	CameraComp->bUsePawnControlRotation = true;
-
-//FPS Mesh
-
-	FPSMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
-	FPSMesh->SetOnlyOwnerSee(true);
-	FPSMesh->SetupAttachment(CameraComp);
-	FPSMesh->bCastDynamicShadow = false;
-	FPSMesh->CastShadow = false;
-
-//Default Mesh
-
-	GetMesh()->SetOwnerNoSee(true);
-	GetMesh()->bCastDynamicShadow = false;
-	GetMesh()->CastShadow = false;
+	CameraComp->SetupAttachment(SpringArmComp);
 
 //Defaults
 
@@ -51,12 +50,14 @@ ASCharacter::ASCharacter()
 
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 
-	ZoomedFOV = 65.0f;
-	ZoomInterpSpeed = 20;
-
-	bIsAI = false;
+	ZoomedFOV = 35.0f;
+	ZoomInterpSpeed = 18;
 
 	WeaponAttachSocketName = "WeaponSocket";
+	WeaponBackAttachSocketName = "WeaponBackSocket";
+
+	IsRifleType = true;
+	bReloading = false;
 }
 
 
@@ -67,9 +68,17 @@ void ASCharacter::BeginPlay()
 	DefaultFOV = CameraComp->FieldOfView;
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
 
-	PlaySong();
+	//Play Song
+	if (IsLocallyControlled() && MusicTrack)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, MusicTrack, GetActorLocation());
+	}
 
 	EquipWeapon(Weapons[0]);
+	if (CurrentWeapon)
+	{
+		IsRifleType = CurrentWeapon->IsRifle;
+	}
 }
 
 
@@ -143,7 +152,10 @@ void ASCharacter::EndCrouch()
 
 void ASCharacter::Zoom()
 {
-	CurrentWeapon->IsTargeting(bWantsToZoom);
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->IsTargeting(bWantsToZoom);
+	}
 }
 
 
@@ -202,12 +214,9 @@ void ASCharacter::Reload()
 	{
 		EndRun();
 	}
-	if (CurrentWeapon)
-	{
-		BPReload();
-	}
+	bReloading = true;
+	GetWorldTimerManager().SetTimer(TimerHandle_ReloadTimer, this, &ASCharacter::FinishAction, 1.4f, false, 0.0f);
 }
-
 
 
 // ------- WEAPON LOGIC ------- \\
@@ -217,48 +226,54 @@ void ASCharacter::EquipWeapon(TSubclassOf<ASWeapon> Weapon)
 {
 	if (Role == ROLE_Authority)
 	{
-		if (CurrentWeapon != nullptr)
-		{
-			CurrentWeapon->Destroy();
-		}
+		ASWeapon* PlaceHolderWeapon = CurrentWeapon;
 
 		//Spawn Rules
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		//Set Current Weapon
-		CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(Weapon, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		if (UnequippedWeapon)
+		{
+			//Switch Weapon
+			CurrentWeapon = UnequippedWeapon;
+			UnequippedWeapon = PlaceHolderWeapon;
+		}
+		else
+		{
+			//Spawn New Current Weapon
+			CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(Weapon, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+			UnequippedWeapon = PlaceHolderWeapon;
+		}
 
 		//Attach the weapon to the socket
 		if (CurrentWeapon)
 		{
-			if (bIsAI)
-			{
-				CurrentWeapon->SetOwner(this);
-				CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponAttachSocketName);
-			}
-			else {
-				CurrentWeapon->SetOwner(this);
-				CurrentWeapon->AttachToComponent(FPSMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponAttachSocketName);
-			}
+			CurrentWeapon->SetOwner(this);
+			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponAttachSocketName);
+			CurrentWeapon->SetActorLocation(GetMesh()->GetSocketLocation(WeaponAttachSocketName));
+
+			IsRifleType = CurrentWeapon->IsRifle;
+		}
+		if (UnequippedWeapon)
+		{
+			UnequippedWeapon->SetOwner(this);
+			UnequippedWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponBackAttachSocketName);
+			UnequippedWeapon->SetActorLocation(GetMesh()->GetSocketLocation(WeaponBackAttachSocketName));
 		}
 	}
+
 }
 
 
 void ASCharacter::NextWeaponInput()
 {
-	int Num = WeaponNum + 1;
-	EquipWeapon(Weapons[Num]);
+	EquipWeapon(Weapons[1]);
 }
 
 
 void ASCharacter::PreviousWeaponInput()
 {
-	int Num = WeaponNum - 1;
-	Num = FMath::Clamp(Num - 1, 0, 2);
-
-	EquipWeapon(Weapons[Num]);
+	EquipWeapon(Weapons[0]);
 }
 
 
@@ -300,12 +315,13 @@ FVector ASCharacter::GetPawnViewLocation() const
 }
 
 
-void ASCharacter::PlaySong()
+FRotator ASCharacter::GetAimOffsets() const
 {
-	if (IsLocallyControlled())
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, ReMixTrax, GetActorLocation());
-	}
+	const FVector AimDirWS = GetBaseAimRotation().Vector();
+	const FVector AimDirLS = ActorToWorld().InverseTransformVectorNoScale(AimDirWS);
+	const FRotator AimRotLS = AimDirLS.Rotation();
+
+	return AimRotLS;
 }
 
 
@@ -317,3 +333,12 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(ASCharacter, bDied);
 }
 
+
+void ASCharacter::FinishAction()
+{
+	if (TimerHandle_ReloadTimer.IsValid() && CurrentWeapon)
+	{
+		CurrentWeapon->ReloadWeapon();
+		bReloading = false;
+	}
+}

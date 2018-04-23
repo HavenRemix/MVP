@@ -368,4 +368,3 @@ bool ASWeapon::IsTargeting(bool WasTargeting)
 
 	return false;
 }
-
