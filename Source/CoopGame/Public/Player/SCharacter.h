@@ -108,6 +108,7 @@ protected:
 //Timer
 
 	FTimerHandle TimerHandle_ReloadTimer;
+	FTimerHandle TimerHandle_SwitchTimer;
 
 public:
 
@@ -152,4 +153,7 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Animations")
 	bool bReloading;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Animations")
+	bool bSwitching;
 };

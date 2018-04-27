@@ -58,6 +58,7 @@ ASCharacter::ASCharacter()
 
 	IsRifleType = true;
 	bReloading = false;
+	bSwitching = false;
 }
 
 
@@ -215,7 +216,7 @@ void ASCharacter::Reload()
 		EndRun();
 	}
 	bReloading = true;
-	GetWorldTimerManager().SetTimer(TimerHandle_ReloadTimer, this, &ASCharacter::FinishAction, 1.4f, false, 0.0f);
+	GetWorldTimerManager().SetTimer(TimerHandle_ReloadTimer, this, &ASCharacter::FinishAction, 1.4f, false, 1.0f);
 }
 
 
@@ -260,8 +261,10 @@ void ASCharacter::EquipWeapon(TSubclassOf<ASWeapon> Weapon)
 			UnequippedWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponBackAttachSocketName);
 			UnequippedWeapon->SetActorLocation(GetMesh()->GetSocketLocation(WeaponBackAttachSocketName));
 		}
-	}
 
+		bSwitching = true;
+		GetWorldTimerManager().SetTimer(TimerHandle_SwitchTimer, this, &ASCharacter::FinishAction, 1.0f, false, 0.0f);
+	}
 }
 
 
@@ -340,5 +343,12 @@ void ASCharacter::FinishAction()
 	{
 		CurrentWeapon->ReloadWeapon();
 		bReloading = false;
+		GetWorldTimerManager().ClearTimer(TimerHandle_ReloadTimer);
+	}
+
+	if (TimerHandle_SwitchTimer.IsValid())
+	{
+		bSwitching = false;
+		GetWorldTimerManager().ClearTimer(TimerHandle_SwitchTimer);
 	}
 }
